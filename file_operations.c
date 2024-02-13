@@ -100,7 +100,7 @@ void encryptData(char *data) {
 bool isFileCorrupted(const char *filename) {
   // Create the path for the original file
   char originalPath[256];
-  snprintf(originalPath, sizeof(originalPath), "files/%s", filename);
+  snprintf(originalPath, sizeof(originalPath), FILE_FOLDER "%s", filename);
 
   // Read the content of the original file
   FILE *originalFile = fopen(originalPath, "rb");
@@ -351,13 +351,14 @@ void repairFile(const char *filename) {
   printf("Attempting to repair file '%s'...\n", filename);
 
   char originalFilename[256];
-  snprintf(originalFilename, sizeof(originalFilename), "files/%s", filename);
+  snprintf(originalFilename, sizeof(originalFilename), FILE_FOLDER "%s",
+           filename);
 
   // Attempt to repair from duplicates
   for (int i = 1; i <= NUM_DUPLICATES; i++) {
     char duplicateFilename[256];
     snprintf(duplicateFilename, sizeof(duplicateFilename),
-             "files/%s_duplicates%d.txt", filename, i);
+             FILE_FOLDER "%s_duplicates%d.txt", filename, i);
 
     if (copyFileContent(duplicateFilename, originalFilename)) {
       printf("File repaired successfully using duplicate %d.\n", i);
@@ -373,7 +374,8 @@ bool isRepairFile(const char *originalFilename, const char *corruptedFilename) {
   printf("Repairing file '%s' using duplicates.\n", corruptedFilename);
 
   char originalPath[256];
-  snprintf(originalPath, sizeof(originalPath), "files/%s", originalFilename);
+  snprintf(originalPath, sizeof(originalPath), FILE_FOLDER "%s",
+           originalFilename);
 
   for (int i = 1; i <= NUM_DUPLICATES; i++) {
     char duplicateFilename[100];
