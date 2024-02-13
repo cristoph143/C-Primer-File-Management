@@ -21,23 +21,6 @@ char *constructFilePath(const char *filename) {
   return filepath;
 }
 
-void createDuplicate(const char *original, const char *duplicate) {
-  FILE *originalFile = fopen(original, "rb");
-  FILE *duplicateFile = fopen(duplicate, "wb");
-  if (originalFile == NULL || duplicateFile == NULL) {
-    perror("Error creating duplicate file");
-    exit(EXIT_FAILURE);
-  }
-
-  int c;
-  while ((c = fgetc(originalFile)) != EOF) {
-    fputc(c, duplicateFile);
-  }
-
-  fclose(originalFile);
-  fclose(duplicateFile);
-}
-
 void writeToFile(const HeaderInfo header, const char *data) {
   // Calculate CRC
   unsigned char crc = calculateCRC(header, data);
@@ -53,33 +36,40 @@ void writeToFile(const HeaderInfo header, const char *data) {
   // Create file path
   char *filepath = constructFilePath(filename);
 
+  // Write header, data, and CRC to file
+  writeHeaderAndDataToFile(header, data, filepath);
+  // Create duplicates
+  for (int i = 0; i < NUM_DUPLICATES; i++) {
+    char duplicateFilename[100];
+    snprintf(duplicateFilename, sizeof(duplicateFilename),
+             "%s%s_duplicates%d.txt", FILE_FOLDER, filename, i + 1);
+    writeHeaderAndDataToFile(header, data, duplicateFilename);
+  }
+
+  printf("File saved successfully.\n");
+  free(filepath);
+}
+
+void writeHeaderAndDataToFile(const HeaderInfo header, const char *data,
+                              const char *filepath) {
   // Open file for writing
   FILE *file = fopen(filepath, "wb");
   if (file == NULL) {
     perror("Error opening file for writing");
-    free(filepath);
+    free((char *)filepath);
     exit(EXIT_FAILURE);
   }
 
   // Write header, data, and CRC to file
   fwrite(&header, sizeof(HeaderInfo), 1, file);
   fwrite(data, sizeof(char), strlen(data), file);
+  unsigned char crc = calculateCRC(header, data);
   fwrite(&crc, sizeof(unsigned char), 1, file);
 
   // Close file
   fclose(file);
-
-  // Create duplicates
-  for (int i = 0; i < NUM_DUPLICATES; i++) {
-    char duplicateFilename[100];
-    snprintf(duplicateFilename, sizeof(duplicateFilename),
-             "%s%s_duplicates%d.txt", FILE_FOLDER, filename, i + 1);
-    createDuplicate(filepath, duplicateFilename);
-  }
-
-  printf("File saved successfully.\n");
-  free(filepath);
 }
+
 // Function to calculate CRC (One's Complement)
 unsigned char calculateCRC(HeaderInfo header, const char *data) {
   unsigned int sum = header.fileID + header.readCount;

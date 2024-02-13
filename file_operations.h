@@ -23,6 +23,8 @@ unsigned char calculateCRC(HeaderInfo header, const char *data);
 unsigned char generateRandomFileID();
 // Function to write data to file
 void writeToFile(const HeaderInfo header, const char *data);
+void writeHeaderAndDataToFile(const HeaderInfo header, const char *data,
+                              const char *filepath);
 void readFromFile(const char *filename);
 // Function to repair corrupted file
 void repairFile(const char *filename);
