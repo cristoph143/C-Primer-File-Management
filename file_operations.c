@@ -166,7 +166,7 @@ void readFromFile(const char *filename) {
   // Create full file path by appending directory path
   char filepath[256]; // Adjust size as needed
   snprintf(filepath, sizeof(filepath), FILE_FOLDER "%s", filename);
-  printf("filepath %s", filepath);
+  printf("filepath %s\n", filepath);
 
   // Open file for reading
   FILE *file = fopen(filepath, "rb");
@@ -224,10 +224,9 @@ void readFromFile(const char *filename) {
   if (calculatedCRC != crc) {
     printf("CRC validation failed for file '%s'. Data may be corrupted.\n",
            filepath);
-    // Check if file is corrupted by comparing with duplicates
-    if (isFileCorrupted(filename)) {
-      // Attempt to repair corrupted file
-      repairFile(filename);
+    // Check and repair corrupted file
+    if (!checkAndRepairCorruptedFile(filename, filename)) {
+      printf("Failed to repair file '%s'.\n", filepath);
     }
     free(data);
     return;
@@ -258,6 +257,16 @@ void readFromFile(const char *filename) {
   fwrite(&crc, sizeof(unsigned char), 1, file);
   fclose(file);
 
+  // Copy content from the original file to all duplicates
+  for (int i = 1; i <= NUM_DUPLICATES; i++) {
+    char duplicateFilename[256];
+    snprintf(duplicateFilename, sizeof(duplicateFilename),
+             FILE_FOLDER "%s_duplicates%d.txt", filename, i);
+    if (copyFileContent(filepath, duplicateFilename)) {
+      printf("Content copied from original file to duplicate %d.\n", i);
+    }
+  }
+
   // Display file content and header information
   printf("File ID: %d\n", header.fileID);
   printf("Read Count: %d\n", header.readCount);
@@ -267,70 +276,134 @@ void readFromFile(const char *filename) {
   free(data);
 }
 
+bool compareFiles(const char *file1, const char *file2) {
+  FILE *f1 = fopen(file1, "rb");
+  FILE *f2 = fopen(file2, "rb");
+
+  if (f1 == NULL || f2 == NULL) {
+    // Error opening files
+    if (f1)
+      fclose(f1);
+    if (f2)
+      fclose(f2);
+    return false;
+  }
+
+  char buffer1[BUFFER_SIZE];
+  char buffer2[BUFFER_SIZE];
+
+  size_t bytesRead1, bytesRead2;
+
+  do {
+    bytesRead1 = fread(buffer1, 1, BUFFER_SIZE, f1);
+    bytesRead2 = fread(buffer2, 1, BUFFER_SIZE, f2);
+
+    if (bytesRead1 != bytesRead2 || memcmp(buffer1, buffer2, bytesRead1) != 0) {
+      fclose(f1);
+      fclose(f2);
+      return false; // Files are different
+    }
+  } while (bytesRead1 > 0);
+
+  fclose(f1);
+  fclose(f2);
+  return true; // Files are identical
+}
+
+// Function to copy content from one file to another
+bool copyFileContent(const char *sourceFilename,
+                     const char *destinationFilename) {
+  FILE *sourceFile = fopen(sourceFilename, "rb");
+  FILE *destinationFile = fopen(destinationFilename, "wb");
+
+  if (sourceFile == NULL || destinationFile == NULL) {
+    if (sourceFile)
+      fclose(sourceFile);
+    if (destinationFile)
+      fclose(destinationFile);
+    return false;
+  }
+
+  // Copy header
+  HeaderInfo header;
+  if (fread(&header, sizeof(HeaderInfo), 1, sourceFile) != 1) {
+    fclose(sourceFile);
+    fclose(destinationFile);
+    return false;
+  }
+  fwrite(&header, sizeof(HeaderInfo), 1, destinationFile);
+
+  // Copy data
+  char buffer[BUFFER_SIZE];
+  size_t bytesRead;
+
+  while ((bytesRead = fread(buffer, 1, BUFFER_SIZE, sourceFile)) > 0) {
+    fwrite(buffer, 1, bytesRead, destinationFile);
+  }
+
+  fclose(sourceFile);
+  fclose(destinationFile);
+  return true;
+}
+
 // Function to repair corrupted file
 void repairFile(const char *filename) {
-  printf("filename %s\n", filename);
-  char originalFilename[100];
-  snprintf(originalFilename, sizeof(originalFilename), "files/%s",
-           filename); // Add "files/" prefix
-  printf("%s\n", originalFilename);
+  printf("Attempting to repair file '%s'...\n", filename);
+
+  char originalFilename[256];
+  snprintf(originalFilename, sizeof(originalFilename), "files/%s", filename);
 
   // Attempt to repair from duplicates
   for (int i = 1; i <= NUM_DUPLICATES; i++) {
-    char duplicateFilename[100];
+    char duplicateFilename[256];
     snprintf(duplicateFilename, sizeof(duplicateFilename),
-             "%s_duplicates%d.txt", originalFilename, i);
-    printf("%s\n", duplicateFilename);
+             "files/%s_duplicates%d.txt", filename, i);
 
-    FILE *originalFile = fopen(originalFilename, "rb");
-    FILE *duplicateFile = fopen(duplicateFilename, "rb");
-
-    if (originalFile == NULL || duplicateFile == NULL) {
-      if (originalFile)
-        fclose(originalFile);
-      if (duplicateFile)
-        fclose(duplicateFile);
-      continue; // Skip if either original or duplicate file is not found
-    }
-
-    char originalData[MAX_DATA_SIZE];
-    char duplicateData[MAX_DATA_SIZE];
-
-    // Read data from original and duplicate files
-    size_t originalSize =
-        fread(originalData, sizeof(char), MAX_DATA_SIZE, originalFile);
-    size_t duplicateSize =
-        fread(duplicateData, sizeof(char), MAX_DATA_SIZE, duplicateFile);
-
-    fclose(originalFile);
-    fclose(duplicateFile);
-
-    // Check if both files were read successfully
-    if (originalSize == 0 || duplicateSize == 0) {
-      printf("Error reading files for repair.\n");
-      return;
-    }
-    // printf("originalSize == duplicateSize %d\n", originalSize ==
-    // duplicateSize); printf("memcmp(originalData, duplicateData, originalSize)
-    // == 0 %d\n",
-    //        memcmp(originalData, duplicateData, originalSize) == 0);
-    // Compare data
-    if (originalSize == duplicateSize &&
-        memcmp(originalData, duplicateData, originalSize) == 0) {
-      FILE *file = fopen(originalFilename, "wb");
-      if (file == NULL) {
-        printf("Error opening file for writing.\n");
-        return;
-      }
-      fwrite(duplicateData, sizeof(char), duplicateSize, file);
-      fclose(file);
-
+    if (copyFileContent(duplicateFilename, originalFilename)) {
       printf("File repaired successfully using duplicate %d.\n", i);
       return;
     }
   }
 
   printf("File repair failed. No valid duplicates found.\n");
+}
+
+// Function to repair corrupted file using duplicates
+bool isRepairFile(const char *originalFilename, const char *corruptedFilename) {
+  printf("Repairing file '%s' using duplicates.\n", corruptedFilename);
+
+  char originalPath[256];
+  snprintf(originalPath, sizeof(originalPath), "files/%s", originalFilename);
+
+  for (int i = 1; i <= NUM_DUPLICATES; i++) {
+    char duplicateFilename[100];
+    snprintf(duplicateFilename, sizeof(duplicateFilename),
+             "%s_duplicates%d.txt", originalFilename, i);
+
+    if (compareFiles(originalPath, duplicateFilename)) {
+      if (copyFileContent(duplicateFilename, originalPath)) {
+        printf("File '%s' repaired successfully using duplicate %d.\n",
+               corruptedFilename, i);
+        return true;
+      }
+    }
+  }
+
+  printf("Repair failed for file '%s'. No valid duplicates found.\n",
+         corruptedFilename);
+  return false;
+}
+bool checkAndRepairCorruptedFile(const char *originalFilename,
+                                 const char *corruptedFilename) {
+  if (!compareFiles(originalFilename, corruptedFilename)) {
+    printf("File '%s' is corrupted. Attempting repair...\n", corruptedFilename);
+    repairFile(corruptedFilename); // Attempt to repair the corrupted file
+    printf("File '%s' repaired successfully.\n", corruptedFilename);
+    return true;
+  } else {
+    printf("File '%s' is not corrupted.\n", corruptedFilename);
+    return true;
+  }
 }
 
 void decryptData(char *data) {

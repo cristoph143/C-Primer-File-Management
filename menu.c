@@ -47,7 +47,7 @@ void exitFunction() { printf("Exiting...\n"); }
  */
 int getValidChoice(int numOptions) {
   int choice;
-  printf("Enter Choice: ");
+  // printf("Enter Choice: ");
   while (scanf("%d", &choice) != 1 || choice < 0 || choice > numOptions) {
     // Clear input buffer
     while (getchar() != '\n')
