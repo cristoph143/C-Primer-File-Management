@@ -28,7 +28,6 @@ void writeHeaderAndDataToFile(const HeaderInfo header, const char *data,
                               const char *filepath);
 void readFromFile(const char *filename);
 // Function to repair corrupted file
-void repairFile(const char *filename);
 bool isRepairFile(const char *originalFilename, const char *corruptedFilename);
 bool copyFileContent(const char *sourceFilename,
                      const char *destinationFilename);
