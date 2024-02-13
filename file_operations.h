@@ -7,6 +7,7 @@
 #define FILE_FOLDER "files/"
 #define NUM_DUPLICATES 2
 #define MAX_DATA_SIZE 100
+#define BUFFER_SIZE 1024
 
 // Structure to represent the header information
 typedef struct {
@@ -23,9 +24,17 @@ unsigned char calculateCRC(HeaderInfo header, const char *data);
 unsigned char generateRandomFileID();
 // Function to write data to file
 void writeToFile(const HeaderInfo header, const char *data);
+void writeHeaderAndDataToFile(const HeaderInfo header, const char *data,
+                              const char *filepath);
 void readFromFile(const char *filename);
 // Function to repair corrupted file
 void repairFile(const char *filename);
+bool isRepairFile(const char *originalFilename, const char *corruptedFilename);
+bool copyFileContent(const char *sourceFilename,
+                     const char *destinationFilename);
 bool isFileCorrupted(const char *filename);
 void decryptData(char *data); // Declaration of decryptData
-#endif                        /* FILE_OPERATIONS_H */
+bool compareFiles(const char *file1, const char *file2);
+bool checkAndRepairCorruptedFile(const char *originalFilename,
+                                 const char *corruptedFilename);
+#endif /* FILE_OPERATIONS_H */
