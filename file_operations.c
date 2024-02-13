@@ -87,16 +87,6 @@ unsigned char generateRandomFileID() {
   return rand() % 256; // Generates a random number between 0 and 255
 }
 
-// Function to encrypt data (simple XOR encryption for demonstration purposes)
-void encryptData(char *data) {
-  char key = 0x5A; // Encryption key
-  while (*data) {
-    *data = *data ^ key;
-    // *data = ~(*data);
-    data++;
-  }
-}
-
 bool isFileCorrupted(const char *filename) {
   // Create the path for the original file
   char originalPath[256];
@@ -204,14 +194,31 @@ void readFromFile(const char *filename) {
     fclose(file);
     return;
   }
-  data[dataSize] = '\0';
-  // decryptData(data); // Decrypt data
+  data[dataSize] = '\0'; // Null-terminate the data
+
+  // Allocate memory for temporary decrypted data
+  char *tempData = (char *)malloc(dataSize + 1);
+  if (tempData == NULL) {
+    printf("Error allocating memory for tempData.\n");
+    free(data);
+    fclose(file);
+    return;
+  }
+
+  // Copy data to tempData
+  strcpy(tempData, data);
+  printf("Before decryption: %s\n", tempData); // Troubleshooting
+
+  // Decrypt tempData
+  decryptData(tempData);
+  printf("After decryption: %s\n", tempData); // Troubleshooting
 
   // Read CRC from file
   unsigned char crc;
   if (fread(&crc, sizeof(unsigned char), 1, file) != 1) {
     printf("Error reading CRC from file '%s'.\n", filepath);
     free(data);
+    free(tempData);
     fclose(file);
     return;
   }
@@ -229,6 +236,7 @@ void readFromFile(const char *filename) {
       printf("Failed to repair file '%s'.\n", filepath);
     }
     free(data);
+    free(tempData);
     return;
   }
 
@@ -236,11 +244,17 @@ void readFromFile(const char *filename) {
   if (header.fileID < 0 || header.fileID > 255) {
     printf("Invalid file ID for file '%s'.\n", filepath);
     free(data);
+    free(tempData);
     return;
   }
 
   // Increment read count
   header.readCount++;
+
+  // Display file content and header information
+  printf("File ID: %d\n", header.fileID);
+  printf("Read Count: %d\n", header.readCount);
+  printf("Data: %s\n", tempData);
 
   // Recalculate CRC based on updated data
   crc = calculateCRC(header, data);
@@ -250,8 +264,10 @@ void readFromFile(const char *filename) {
   if (file == NULL) {
     printf("Error opening file '%s' for writing.\n", filepath);
     free(data);
+    free(tempData);
     return;
   }
+
   fwrite(&header, sizeof(HeaderInfo), 1, file);
   fwrite(data, sizeof(char), dataSize, file);
   fwrite(&crc, sizeof(unsigned char), 1, file);
@@ -267,13 +283,9 @@ void readFromFile(const char *filename) {
     }
   }
 
-  // Display file content and header information
-  printf("File ID: %d\n", header.fileID);
-  printf("Read Count: %d\n", header.readCount);
-  printf("Data: %s\n", data);
-
   // Free allocated memory
   free(data);
+  free(tempData);
 }
 
 bool compareFiles(const char *file1, const char *file2) {
@@ -409,10 +421,15 @@ bool checkAndRepairCorruptedFile(const char *originalFilename,
 }
 
 void decryptData(char *data) {
-  char key = 0x5A; // Decryption key
   while (*data) {
-    // *data = *data ^ key;
+    *data = ~(*data);
+    data++;
+  }
+}
 
+// Function to encrypt data (simple XOR encryption for demonstration purposes)
+void encryptData(char *data) {
+  while (*data) {
     *data = ~(*data);
     data++;
   }

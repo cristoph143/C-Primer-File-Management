@@ -85,7 +85,7 @@ void createAndSaveFile() {
   scanf(" %[^\n]", data);
 
   // Encrypt data for security
-  // encryptData(data);
+  encryptData(data);
 
   // Write data to file
   writeToFile(header, data);
