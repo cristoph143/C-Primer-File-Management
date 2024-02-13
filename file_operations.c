@@ -257,6 +257,16 @@ void readFromFile(const char *filename) {
   fwrite(&crc, sizeof(unsigned char), 1, file);
   fclose(file);
 
+  // Copy content from the original file to all duplicates
+  for (int i = 1; i <= NUM_DUPLICATES; i++) {
+    char duplicateFilename[256];
+    snprintf(duplicateFilename, sizeof(duplicateFilename),
+             FILE_FOLDER "%s_duplicates%d.txt", filename, i);
+    if (copyFileContent(filepath, duplicateFilename)) {
+      printf("Content copied from original file to duplicate %d.\n", i);
+    }
+  }
+
   // Display file content and header information
   printf("File ID: %d\n", header.fileID);
   printf("Read Count: %d\n", header.readCount);
@@ -314,6 +324,16 @@ bool copyFileContent(const char *sourceFilename,
     return false;
   }
 
+  // Copy header
+  HeaderInfo header;
+  if (fread(&header, sizeof(HeaderInfo), 1, sourceFile) != 1) {
+    fclose(sourceFile);
+    fclose(destinationFile);
+    return false;
+  }
+  fwrite(&header, sizeof(HeaderInfo), 1, destinationFile);
+
+  // Copy data
   char buffer[BUFFER_SIZE];
   size_t bytesRead;
 
