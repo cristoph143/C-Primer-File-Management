@@ -78,7 +78,7 @@ unsigned char calculateCRC(HeaderInfo header, const char *data) {
     sum += *data;
     data++;
   }
-  printf("data %s", data);
+  printf("data %s\n", data);
   return ~(sum & 0xFF); // One's complement
 }
 
@@ -112,12 +112,16 @@ bool isFileCorrupted(const char *filename) {
   originalData[originalSize] = '\0';
   fclose(originalFile);
 
+  // Check if the original file is corrupted
+  bool isOriginalCorrupted = true;
+
   // Iterate through each duplicate file
   for (int i = 1; i <= NUM_DUPLICATES; i++) {
     // Create the path for the duplicate file
     char duplicatePath[256];
     snprintf(duplicatePath, sizeof(duplicatePath), "%s%s_duplicates%d.txt",
              FILE_FOLDER, filename, i);
+
     // Read the content of the duplicate file
     FILE *duplicateFile = fopen(duplicatePath, "rb");
     if (duplicateFile == NULL) {
@@ -139,17 +143,60 @@ bool isFileCorrupted(const char *filename) {
     fclose(duplicateFile);
 
     // Compare the content of the duplicate with the original
-    if (strcmp(originalData, duplicateData) == 0) {
+    if (strcmp(originalData, duplicateData) == 0 && !isOriginalCorrupted) {
       // Found a matching duplicate, file is not corrupted
       printf("File '%s' is not corrupted. Match found in duplicate %d.\n",
              filename, i);
-      return false;
+      isOriginalCorrupted = false;
+      break;
     }
   }
 
-  // None of the duplicates match the original, file is considered corrupted
-  printf("File '%s' is corrupted. No matching duplicate found.\n", filename);
-  return true;
+  // If the original file is corrupted, return true
+  if (isOriginalCorrupted) {
+    printf("Original file '%s' is corrupted.\n", filename);
+    return true;
+  }
+
+  // None of the duplicates match the original, check if any duplicates are
+  // corrupted
+  for (int i = 1; i <= NUM_DUPLICATES; i++) {
+    // Create the path for the duplicate file
+    char duplicatePath[256];
+    snprintf(duplicatePath, sizeof(duplicatePath), "%s%s_duplicates%d.txt",
+             FILE_FOLDER, filename, i);
+
+    // Read the content of the duplicate file
+    FILE *duplicateFile = fopen(duplicatePath, "rb");
+    if (duplicateFile == NULL) {
+      printf("Error opening duplicate file '%s' for reading.\n", duplicatePath);
+      continue; // Continue with the next duplicate if this one cannot be opened
+    }
+
+    fseek(duplicateFile, 0, SEEK_END);
+    long duplicateSize = ftell(duplicateFile);
+    fseek(duplicateFile, 0, SEEK_SET);
+    char duplicateData[duplicateSize + 1];
+    if (fread(duplicateData, sizeof(char), duplicateSize, duplicateFile) !=
+        duplicateSize) {
+      fclose(duplicateFile);
+      printf("Error reading duplicate file '%s'.\n", duplicatePath);
+      continue; // Continue with the next duplicate if unable to read
+    }
+    duplicateData[duplicateSize] = '\0';
+    fclose(duplicateFile);
+
+    // Compare the content of the duplicate with the original
+    if (strcmp(originalData, duplicateData) != 0) {
+      // Found a mismatch, duplicate is corrupted
+      printf("Duplicate %d of file '%s' is corrupted.\n", i, filename);
+      return true;
+    }
+  }
+
+  // All duplicates match the original, file is not corrupted
+  printf("File '%s' is not corrupted.\n", filename);
+  return false;
 }
 
 void readFromFile(const char *filename) {

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define FILE_FOLDER "file_folder/"
+#define FILE_FOLDER "sample/"
 #define NUM_DUPLICATES 2
 #define MAX_DATA_SIZE 100
 #define BUFFER_SIZE 1024
